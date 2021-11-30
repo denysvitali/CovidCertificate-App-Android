@@ -40,7 +40,6 @@ import ch.admin.bag.covidcertificate.common.views.hideAnimated
 import ch.admin.bag.covidcertificate.common.views.showAnimated
 import ch.admin.bag.covidcertificate.sdk.android.extensions.DEFAULT_DISPLAY_DATE_FORMATTER
 import ch.admin.bag.covidcertificate.sdk.android.extensions.DEFAULT_DISPLAY_DATE_TIME_FORMATTER
-import ch.admin.bag.covidcertificate.sdk.android.utils.*
 import ch.admin.bag.covidcertificate.sdk.core.extensions.isNotFullyProtected
 import ch.admin.bag.covidcertificate.sdk.core.models.healthcert.CertType
 import ch.admin.bag.covidcertificate.sdk.core.models.healthcert.CertificateHolder
@@ -49,7 +48,6 @@ import ch.admin.bag.covidcertificate.sdk.core.models.state.CheckNationalRulesSta
 import ch.admin.bag.covidcertificate.sdk.core.models.state.CheckRevocationState
 import ch.admin.bag.covidcertificate.sdk.core.models.state.CheckSignatureState
 import ch.admin.bag.covidcertificate.sdk.core.models.state.VerificationState
-import ch.admin.bag.covidcertificate.sdk.core.verifier.nationalrules.ValidityRange
 import ch.admin.bag.covidcertificate.wallet.CertificatesViewModel
 import ch.admin.bag.covidcertificate.wallet.R
 import ch.admin.bag.covidcertificate.wallet.databinding.FragmentCertificateDetailBinding
@@ -63,9 +61,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.w3c.dom.Text
+import java.lang.Integer.max
 import java.time.LocalDateTime
-import java.time.Month
 
 class CertificateDetailFragment : Fragment() {
 
@@ -188,6 +185,9 @@ class CertificateDetailFragment : Fragment() {
 			}
 			dialog.show()
 		}
+
+		setupReverifyButtonOffset()
+
 	}
 
 	override fun onResume() {
@@ -249,6 +249,24 @@ class CertificateDetailFragment : Fragment() {
 		}
 
 		certificatesViewModel.startVerification(certificateHolder)
+	}
+
+	private fun setupReverifyButtonOffset() {
+		val certPos = intArrayOf(0, 0)
+		val buttonPos = intArrayOf(0, 0)
+
+		binding.root.post { reloadReverifyButtonOffset(certPos, buttonPos) }
+		binding.scrollview.setOnScrollChangeListener { _, _, _, _, _ -> reloadReverifyButtonOffset(certPos, buttonPos) }
+	}
+
+	private fun reloadReverifyButtonOffset(certPos: IntArray = intArrayOf(0, 0), buttonPos: IntArray = intArrayOf(0, 0)) {
+		binding.certificateDetailQrCode.getLocationOnScreen(certPos)
+		val certificateBottomY = certPos[1] + binding.certificateDetailQrCode.height
+		binding.certificateDetailButtonReverify.getLocationOnScreen(buttonPos)
+		val buttonTopY = buttonPos[1] - binding.certificateDetailButtonReverify.translationY.toInt()
+
+		binding.certificateDetailButtonReverify.translationY = max(0, certificateBottomY - buttonTopY).toFloat()
+
 	}
 
 	private fun setupConversionButtons() {
@@ -327,10 +345,10 @@ class CertificateDetailFragment : Fragment() {
 		val isIssuedInSwitzerland = ISSUER_SWITZERLAND.contains(certificateHolder.issuer)
 		updateConversionButtons(isLightCertificateEnabled = isIssuedInSwitzerland, isPdfExportEnabled = isIssuedInSwitzerland)
 
-		var info: SpannableString
-		var iconId: Int
-		var showRedBorder: Boolean
-		if (certificateHolder.containsCertOnlyValidInCH()) {
+		val info: SpannableString
+		val iconId: Int
+		val showRedBorder: Boolean
+		if (state.isValidOnlyInSwitzerland) {
 			info = SpannableString(context.getString(R.string.wallet_only_valid_in_switzerland))
 			iconId = R.drawable.ic_flag_ch
 			showRedBorder = true
